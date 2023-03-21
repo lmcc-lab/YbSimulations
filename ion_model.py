@@ -200,31 +200,48 @@ class GenMeshgrid:
             self.__setattr__(name, meshgrids[i])
 
 
-def calculate_171_pop(detuning: Union[np.array, float],
+def calculate_171_pop(detuning370: Union[np.array, float] = 0,
+                      detuning935: Union[np.array, float] = 0,
                       I935: Union[np.array, float, None] = None,
                       I370: Union[np.array, float, None] = None,
-                      thetaBE: Union[np.array, float, None] = None,
+                      thetaBE370: Union[np.array, float, None] = None,
+                      thetaBE935: Union[np.array, float, None] = None,
                       b_field: Union[PolarVector, None] = None,
-                      e_field: Union[PolarVector, None] = None,
+                      e_field_370: Union[PolarVector, None] = None,
+                      e_field_935: Union[PolarVector, None] = None,
                       b_mag: Union[np.array, float, None] = None,
                       zeeman: Union[np.array, float, None] = None,
                       s_370: Union[np.array, float, None] = None,
                       s_935: Union[np.array, float, None] = None):
 
-    cart = None
+    cart370 = None
+    cart935 = None
 
     yb171 = Yb171()
 
-    if thetaBE is not None and b_mag is not None:
+    if thetaBE370 is not None and b_mag is not None:
         pass
-    elif e_field is not None and b_field is not None:
-        thetaBE, cart = b_field.calculate_angle_between(e_field)
+    elif e_field_370 is not None and b_field is not None:
+        thetaBE370, cart370 = b_field.calculate_angle_between(e_field_370)
         b_mag = b_field.r
-    elif thetaBE is not None and zeeman is not None:
+    elif thetaBE370 is not None and zeeman is not None:
         pass
     else:
-        raise ValueError("ThetaBE cannot be calculated. e_field, b_field or thetaBE, b_mag aren't supplied. "
-                         "Either thetaBE and b_mag needs to be supplied or e_field and b_field.")
+        raise ValueError("ThetaBE370 cannot be calculated. e_field_370, b_field or thetaBE370, b_mag aren't supplied. "
+                         "Either thetaBE370 and b_mag needs to be supplied or e_field_370 and b_field.")
+    
+
+    if thetaBE935 is not None and b_mag is not None:
+        pass
+    elif e_field_935 is not None and b_field is not None:
+        thetaBE935, cart935 = b_field.calculate_angle_between(e_field_935)
+        b_mag = b_field.r
+    elif thetaBE935 is not None and zeeman is not None:
+        pass
+    else:
+        raise ValueError("ThetaBE370 cannot be calculated. e_field_370, b_field or thetaBE370, b_mag aren't supplied. "
+                         "Either thetaBE370 and b_mag needs to be supplied or e_field_370 and b_field.")
+
 
     if I370 is not None:
         s0_370 = yb171.s0(I370, yb171.I370sat)
@@ -242,18 +259,18 @@ def calculate_171_pop(detuning: Union[np.array, float],
 
     zeeman = yb171.zeeman_shift(b_mag, 1) if zeeman is None else zeeman
 
-    variables = (thetaBE, detuning, s0_370, s0_935, zeeman)
+    variables = (thetaBE370, thetaBE935, detuning370, detuning935, s0_370, s0_935, zeeman)
 
-    mesh = GenMeshgrid(variables, ("thetaBE", "detuning", "s0_370", "s0_935", "zeeman"))
+    mesh = GenMeshgrid(variables, ("thetaBE370", "thetaBE935", "detuning370", "detuning935", "s0_370", "s0_935", "zeeman"))
     mesh.gen_meshgrid()
 
     rabi_370 = yb171.rabi_freq(mesh.s0_370, yb171.gamma_2S12_2P12)
-    eff_linewidth_370 = yb171.effective_linewidth(mesh.thetaBE, rabi_370, mesh.zeeman, yb171.gamma_2S12_2P12)
-    excited_pop_370 = yb171.excited_population_no_leakage(rabi_370, eff_linewidth_370, mesh.thetaBE, mesh.detuning)
+    eff_linewidth_370 = yb171.effective_linewidth(mesh.thetaBE370, rabi_370, mesh.zeeman, yb171.gamma_2S12_2P12)
+    excited_pop_370 = yb171.excited_population_no_leakage(rabi_370, eff_linewidth_370, mesh.thetaBE370, mesh.detuning370)
 
-    rabi_935 = yb171.rabi_freq(mesh.s0_935, yb171.gamma_2S12_2P12)
-    eff_linewidth_935 = yb171.effective_linewidth(mesh.thetaBE, rabi_935, mesh.zeeman, yb171.gamma_2S12_2P12)
-    excited_pop_935 = yb171.excited_population_no_leakage(rabi_935, eff_linewidth_935, mesh.thetaBE, mesh.detuning)
+    rabi_935 = yb171.rabi_freq(mesh.s0_935, yb171.gamma_2D32_3D3212)
+    eff_linewidth_935 = yb171.effective_linewidth(mesh.thetaBE935, rabi_935, mesh.zeeman, yb171.gamma_2D32_3D3212)
+    excited_pop_935 = yb171.excited_population_no_leakage(rabi_935, eff_linewidth_935, mesh.thetaBE935, mesh.detuning935)
 
     eta = yb171.eta(excited_pop_935)
     excited_pop = yb171.excited_population_with_leakage(excited_pop_370, eta)
@@ -269,7 +286,7 @@ def calculate_171_pop(detuning: Union[np.array, float],
                         "pop": excited_pop_935},
                   "eta": eta}
 
-    return excited_pop, mesh, yb171, cart, other_data
+    return excited_pop, mesh, yb171, (cart370, cart935), other_data
 
 
 def calculate_174_pop(detuning: Union[np.array, float],
@@ -369,6 +386,10 @@ class fitting_free_params:
         thetaBE = self.b_field.calculate_angle_between(self.e_field)
         calculate_171_pop(detuning, I370, self.I935, )
 
+
+def Lorentzian(x, x0, Gamma):
+    half_Gamma = Gamma/2
+    return 1/np.pi * half_Gamma / ((x-x0)**2 + half_Gamma**2)
 
 
 
