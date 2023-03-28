@@ -3,6 +3,7 @@ from numpy import pi as pi
 from scipy.constants import h, c, hbar
 from scipy.constants import physical_constants
 from typing import Union
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 
@@ -85,13 +86,10 @@ class Yb174(Yb):
         gamma92 = 9 * gamma ** 2
         zeeman162 = 16 * zeeman_shift ** 2 / gamma92
         return rabi_freq**2/6 + gamma**2/4 * (1 + zeeman162) *\
-               (1 + 64 * zeeman_shift**2 / gamma92) / (1 + zeeman162 * 3 * cos2 + 1)
+               (1 + 64 * zeeman_shift**2 / gamma92) / (1 + zeeman162 * (3 * cos2 + 1))
 
     def excited_population_no_leakage(self, rabi_freq, effective_linewidth, detuning):
         return 1/2 * (rabi_freq**2 / 6) / (detuning ** 2 + effective_linewidth)
-
-    def eta(self):
-        return 0.1
 
 
 class PolarVectorGeneral:
@@ -212,7 +210,8 @@ def calculate_171_pop(detuning370: Union[np.array, float] = 0,
                       b_mag: Union[np.array, float, None] = None,
                       zeeman: Union[np.array, float, None] = None,
                       s_370: Union[np.array, float, None] = None,
-                      s_935: Union[np.array, float, None] = None):
+                      s_935: Union[np.array, float, None] = None,
+                      make_mesh=True):
 
     cart370 = None
     cart935 = None
@@ -262,7 +261,8 @@ def calculate_171_pop(detuning370: Union[np.array, float] = 0,
     variables = (thetaBE370, thetaBE935, detuning370, detuning935, s0_370, s0_935, zeeman)
 
     mesh = GenMeshgrid(variables, ("thetaBE370", "thetaBE935", "detuning370", "detuning935", "s0_370", "s0_935", "zeeman"))
-    mesh.gen_meshgrid()
+    if make_mesh:
+        mesh.gen_meshgrid()
 
     rabi_370 = yb171.rabi_freq(mesh.s0_370, yb171.gamma_2S12_2P12)
     eff_linewidth_370 = yb171.effective_linewidth(mesh.thetaBE370, rabi_370, mesh.zeeman, yb171.gamma_2S12_2P12)
@@ -301,7 +301,8 @@ def calculate_174_pop(detuning370: Union[np.array, float] = 0,
                       b_mag: Union[np.array, float, None] = None,
                       zeeman: Union[np.array, float, None] = None,
                       s_370: Union[np.array, float, None] = None,
-                      s_935: Union[np.array, float, None] = None):
+                      s_935: Union[np.array, float, None] = None,
+                      make_mesh=True):
 
     cart370 = None
     cart935 = None
@@ -351,7 +352,8 @@ def calculate_174_pop(detuning370: Union[np.array, float] = 0,
     variables = (thetaBE370, thetaBE935, detuning370, detuning935, s0_370, s0_935, zeeman)
 
     mesh = GenMeshgrid(variables, ("thetaBE370", "thetaBE935", "detuning370", "detuning935", "s0_370", "s0_935", "zeeman"))
-    mesh.gen_meshgrid()
+    if make_mesh:
+        mesh.gen_meshgrid()
 
     rabi_370 = yb174.rabi_freq(mesh.s0_370, yb174.gamma_2S12_2P12)
     eff_linewidth_370 = yb174.effective_linewidth(mesh.thetaBE370, rabi_370, mesh.zeeman, yb174.gamma_2S12_2P12)
@@ -361,7 +363,7 @@ def calculate_174_pop(detuning370: Union[np.array, float] = 0,
     eff_linewidth_935 = yb174.effective_linewidth(mesh.thetaBE935, rabi_935, mesh.zeeman, yb174.gamma_2D32_3D3212)
     excited_pop_935 = yb174.excited_population_no_leakage(rabi_935, eff_linewidth_935, mesh.detuning935)
 
-    eta = yb174.eta()
+    eta = yb174.eta(excited_pop_935)
     excited_pop = yb174.excited_population_with_leakage(excited_pop_370, eta)
 
     other_data = {370: {"s0": mesh.s0_370,
@@ -381,34 +383,57 @@ def calculate_174_pop(detuning370: Union[np.array, float] = 0,
 class GenerateTestData:
 
     def __init__(self, *args, **kwargs):
-        self.excited_pop_174, self.mesh_174, self.yb174 = calculate_174_pop(*args, **kwargs)
-        self.excited_pop_171, self.mesh_171, self.yb171 = calculate_171_pop(*args, **kwargs)
+        self.excited_pop_174, self.mesh_174, self.yb174, _, self.other_174 = calculate_174_pop(*args, **kwargs)
+        self.excited_pop_171, self.mesh_171, self.yb171, _, self.other_171 = calculate_171_pop(*args, **kwargs)
 
     def randomise(self, variance, seed=None):
 
         np.random.seed(seed)
 
-        self.excited_pop_171 = self.excited_pop_174 + np.random.normal(loc=0, scale=np.sqrt(variance),
+        self.excited_pop_171 = self.excited_pop_171 + np.random.normal(loc=0, scale=np.sqrt(variance),
                                                                        size=len(self.excited_pop_171))
         self.excited_pop_174 = self.excited_pop_174 + np.random.normal(loc=0, scale=np.sqrt(variance),
                                                                        size=len(self.excited_pop_174))
 
 
-class fitting_free_params:
+class FitFreeParams:
 
-    def __init__(self, br, btheta, bphi, er, etheta, ephi, I935):
-        self.b_field = PolarVector(br, btheta, bphi)
-        self.e_field = PolarVector(er, etheta, ephi)
-        self.I935 = I935
+    """This class should use the calculate_pop functions for 171 and 174 to fit free parameters.
+    We will assume we have some known parameters (the ones were sweeping) and the rest are free or
+    constant. Free parameters should be left blank, """
 
-    def fit(self, I370, detuning, b_mag, b_theta, b_phi, e_theta, Isat):
+    def __init__(self, x, y, x_variable_names, yb_model):
+        all_variables = ("thetaBE370", "s_370", "detuning370", "detuning935", "s_935", "zeeman", "thetaBE935")
+        # check if x_variable_names is in all_variables
+        if not all([name in all_variables for name in x_variable_names]):
+            raise ValueError(f"x_variable_names must match exactly the names {all_variables}. Received names were {x_variable_names}.")
+        self.free_params = list(all_variables)
+        for x_name in x_variable_names:
+            self.free_params.remove(x_name)
+
+        ordered_variable_names = list(x_variable_names)
+        ordered_variable_names.extend(self.free_params)
+        self.ordered_variable_names = tuple(ordered_variable_names)
+        self.func = yb_model
+        self.x = x
+        self.y = y
+
+    def fit_func(self, x: tuple, *args):
         """
         I370, detuning, b_mag and e_theta should be the independent variables. e_phi should be fixed
         and b_theta and Isat should be free parameters to be fitted.
         """
-        self.e_field.theta = e_theta
-        thetaBE = self.b_field.calculate_angle_between(self.e_field)
-        calculate_171_pop(detuning, I370, self.I935, )
+        listx = list(x)
+        listx.extend(list(args))
+        kwargs = {name: listx[i] for i, name in enumerate(self.ordered_variable_names)}
+        kwargs['make_mesh'] = False
+        y, _, _, _, _ = self.func(**kwargs)
+        return y
+    
+    def fit(self, p0=None):
+        popt, pcov = curve_fit(self.fit_func, self.x, self.y, p0=p0)
+        return popt, pcov
+
 
 
 def Lorentzian(x, x0, Gamma):
