@@ -100,6 +100,28 @@ class PolarVectorGeneral:
         self.r = r
         self.theta = theta
         self.phi = phi
+        self.v = self.convert_to_cartesian()
+
+    @staticmethod
+    def Rx(theta):
+        Rx = np.array([[1,             0,              0], 
+                       [0, np.cos(theta), -np.sin(theta)], 
+                       [0, np.sin(theta),  np.cos(theta)]])
+        return Rx
+    
+    @staticmethod
+    def Ry(theta):
+        Ry = np.array([[np.cos(theta), 0,  np.sin(theta)], 
+                       [0,             1,              0], 
+                       [-np.sin(theta), 0, np.cos(theta)]])
+        return Ry
+    
+    @staticmethod
+    def Rz(theta):
+        Rz = np.array([[np.cos(theta), -np.sin(theta), 0], 
+                       [np.sin(theta),  np.cos(theta), 0], 
+                       [0,          0,                 1]])
+        return Rz
 
     def update(self, r, theta, phi):
         self.r = r
@@ -108,18 +130,34 @@ class PolarVectorGeneral:
 
     def rotate_theta_by(self, radians):
         self.theta += radians
+        self.v = self.convert_to_cartesian()
 
     def rotate_phi_by(self, radians):
         self.phi += radians
+        self.v = self.convert_to_cartesian()
 
-    def change_mag(self, change):
-        self.r += r
+    def change_mag(self, length):
+        self.r += length
+        self.v = self.convert_to_cartesian()
 
     def convert_to_cartesian(self):
-        x = self.r * np.sin(self.theta) * np.cos(self.phi)
-        y = self.r * np.sin(self.theta) * np.sin(self.phi)
-        z = self.r * np.cos(self.theta)
-        return np.array([x, y, z])
+        x = self.r * np.sin(self.phi) * np.cos(self.theta)
+        y = self.r * np.sin(self.phi) * np.sin(self.theta)
+        z = self.r * np.cos(self.phi)
+        return np.array([[0,x], [0,y], [0,z]])
+    
+    def rotate_about_x(self, theta):
+        self.v = self.Rx(theta) @ self.v
+    
+    def rotate_about_y(self, theta):
+        self.v = self.Ry(theta) @ self.v
+
+    def rotate_about_z(self, theta):
+        self.v = self.Rz(theta) @ self.v
+    
+    def translate(self, translation):
+        self.v = self.v + translation
+
 
 
 def unwrap_angle(angles):
@@ -179,6 +217,7 @@ class PolarVector(PolarVectorGeneral):
         angle = np.arccos(dot/(self.r * other_vector.r))
         unwrap_angle(angle)
         return angle, (cart1, cart2)
+        
 
 
 class GenMeshgrid:
