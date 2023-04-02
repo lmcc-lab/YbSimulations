@@ -1,7 +1,8 @@
 import plotly.graph_objs as go
 from ion_model import PolarVector
 import numpy as np
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Dict, Iterable
+from pprint import pprint
 
 
 class VectorPlot:
@@ -16,23 +17,45 @@ class VectorPlot:
         self.y_axis.translate(np.array([[0, 0], [-1.5, -1.5], [0, 0]]))
         self.z_axis.translate(np.array([[0, 0], [0, 0], [-1.5, -1.5]]))
 
-        self.vectors = [(self.x_axis, self.y_axis, self.z_axis)]
+        self.vectors = [(self.x_axis, self.y_axis, self.z_axis), {}]
+        self.colors = None
+        self.graph_objects = []
+        self.array_objects = []
+        self.graph_objects_kwargs = []
+        self.vector_kwargs = {}
 
-    def add_vector(self, vectors: Union[PolarVector, List[PolarVector], Tuple[PolarVector]]):
-
-        if isinstance(vectors, tuple) or isinstance(vectors, list):
-            self.vectors.extend(vectors)
-        else:
-            self.vectors.append(vectors)
+    def add_vector(self, vectors: Dict[str, PolarVector], kwargs: Dict[str, dict] = {}):
+        self.vectors[1].update(vectors)
+        self.vector_kwargs.update(kwargs)
     
     def align_vectors_with_experiment(self, theta=np.pi/2):
-        for i, vector in enumerate(self.vectors):
+        for i, group in enumerate(self.vectors):
             if i == 0:
-                for axis_vec in vector:
+                for axis_vec in group:
                     axis_vec.rotate_about_x(theta)
             else:
-                vector.rotate_about_x(theta)
-        
+                for vector in group.values():
+                    vector.rotate_about_x(theta)
+        for i, array in enumerate(self.array_objects):
+            self.array_objects[i] = PolarVector.Rx(theta) @ array
+    
+    def add_arc_between_vecs(self, vec1: PolarVector, vec2: PolarVector, **kwargs):
+        arc = PolarVector(0.5, vec1.theta, vec1.phi)
+        angle = vec1.calculate_angle_between(vec2)
+        angle = np.linspace(0, angle)
+        x, y, z = np.zeros(len(angle)), np.zeros(len(angle)), np.zeros(len(angle))
+        RotMat = vec1.arb_rot_mat(vec2, angle[1])
+        for i, a in enumerate(angle):
+            arc.rotate_with_rotation_matrix(RotMat)
+            x[i], y[i], z[i] = arc.v[:, 1]
+        self.add_line(x, y, z, **kwargs)
+
+
+    def add_line(self, x, y, z, mode='lines', **kwargs):
+        kwargs.update({"mode": mode})
+        self.array_objects.append(np.array([x, y, z]))
+        self.graph_objects_kwargs.append(kwargs)
+
     def plot(self):
         # prepare for plotting
         axis_labels = ["x", "y", "z"]
@@ -44,25 +67,31 @@ class VectorPlot:
         x_vector["text"] = ["", "x"]
         y_vector["text"] = ["", "y"]
         z_vector["text"] = ["", "z"]
+        x_vector["name"] = "x"
+        y_vector["name"] = "y"
+        z_vector["name"] = "z"
 
-        other_vectors_lines = [{"line": {label: coordinates for label, coordinates in zip(axis_labels, vector.v)}, 
-                                "head": {label: [vector.v[i%3][1]] for i, label in enumerate(axis_labels_head)}} 
-                                for vector in self.vectors[1:]]
+        other_vectors_lines = {name: {"line": {label: coordinates for label, coordinates in zip(axis_labels, list(vector.v))}, 
+                                "head": {label: [vector.v[i%3][1], vector.v[i%3][0]] if label not in axis_labels_head[3:] else [vector.v[i%3][1] - vector.v[i%3][0]] for i, label in enumerate(axis_labels_head)}} 
+                                for name, vector in self.vectors[1].items()}
         
-        x_axis = go.Scatter3d(**x_vector, mode='lines+text', line={"color": "black"})
-        y_axis = go.Scatter3d(**y_vector, mode='lines+text', line={"color": "black"})
-        z_axis = go.Scatter3d(**z_vector, mode='lines+text', line={"color": "black"})
+        # Add x, y, z axes to graph_objects list
+        self.graph_objects.append(go.Scatter3d(**x_vector, mode='lines+text', line={"color": "black"}))
+        self.graph_objects.append(go.Scatter3d(**y_vector, mode='lines+text', line={"color": "black"}))
+        self.graph_objects.append(go.Scatter3d(**z_vector, mode='lines+text', line={"color": "black"}))
 
-        # create the line body
-        vector_plot = [x_axis, y_axis, z_axis]
-        for vector in other_vectors_lines:
-            plotted_line = go.Scatter3d(**vector['line'], mode='lines', name='Vector')
-            plotted_head = go.Cone(**vector['head'], sizemode="absolute", sizeref=0.5, name='Arrow')
-            vector_plot.extend([plotted_line, plotted_head])
+        for name, vector in other_vectors_lines.items():
+            plotted_line = go.Scatter3d(**vector['line'], mode='lines+text', name=name, **self.vector_kwargs.get(name, {}))
+            plotted_head = go.Cone(**vector['head'], sizemode="absolute", sizeref=0.5, showscale=False)
+            self.graph_objects.extend([plotted_line, plotted_head])
+        
+        for kw, array in zip(self.graph_objects_kwargs, self.array_objects):
+            kw.update({"x": array[0], "y": array[1], "z": array[2]})
+            self.graph_objects.append(go.Scatter3d(**kw))
         
         layout = go.Layout(title='3D Vector with Cone Arrow')
 
-        fig = go.Figure(data=vector_plot, layout=layout)
+        fig = go.Figure(data=self.graph_objects, layout=layout)
         fig.update_scenes(xaxis_visible=False, yaxis_visible=False, zaxis_visible=False)
 
         return fig

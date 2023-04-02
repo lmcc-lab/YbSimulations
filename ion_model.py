@@ -94,13 +94,17 @@ class Yb174(Yb):
 
 class PolarVectorGeneral:
     def __init__(self,
-                 r: Union[float, np.array],
-                 theta: Union[float, np.array],
-                 phi: Union[float, np.array]):
+                 r: float,
+                 theta: float,
+                 phi: float):
         self.r = r
         self.theta = theta
         self.phi = phi
-        self.v = self.convert_to_cartesian()
+        self.pv = np.array([[self.r], [self.theta], [self.phi]])
+        x = self.r * np.sin(self.phi) * np.cos(self.theta)
+        y = self.r * np.sin(self.phi) * np.sin(self.theta)
+        z = self.r * np.cos(self.phi)
+        self.v = np.array([[0, x], [0, y], [0, z]])
 
     @staticmethod
     def Rx(theta):
@@ -130,35 +134,48 @@ class PolarVectorGeneral:
 
     def rotate_theta_by(self, radians):
         self.theta += radians
-        self.v = self.convert_to_cartesian()
+        self.convert_to_cartesian()
 
     def rotate_phi_by(self, radians):
         self.phi += radians
-        self.v = self.convert_to_cartesian()
+        self.convert_to_cartesian()
 
     def change_mag(self, length):
         self.r += length
-        self.v = self.convert_to_cartesian()
+        self.convert_to_cartesian()
 
     def convert_to_cartesian(self):
         x = self.r * np.sin(self.phi) * np.cos(self.theta)
         y = self.r * np.sin(self.phi) * np.sin(self.theta)
         z = self.r * np.cos(self.phi)
-        return np.array([[0,x], [0,y], [0,z]])
+        self.v = np.array([[0, x], [0, y], [0, z]])
+    
+    def convert_to_spherical(self):
+        vec = self.v[:, 1] - self.v[:, 0]
+        self.r = np.sqrt(sum(vec**2))
+        self.theta = np.arccos(vec[2]/ self.r)
+        self.phi = np.arctan2(vec[1], vec[0])
+        self.pv = np.array([[self.r], [self.theta], [self.phi]])
     
     def rotate_about_x(self, theta):
         self.v = self.Rx(theta) @ self.v
+        self.convert_to_spherical()
     
     def rotate_about_y(self, theta):
         self.v = self.Ry(theta) @ self.v
+        self.convert_to_spherical()
 
     def rotate_about_z(self, theta):
         self.v = self.Rz(theta) @ self.v
+        self.convert_to_spherical()
     
     def translate(self, translation):
         self.v = self.v + translation
 
-
+    def flip(self):
+        self.v = np.flip(self.v, 1)
+        self.convert_to_spherical()
+   
 
 def unwrap_angle(angles):
     """ Assumed that the angle should be going in one direction at all times """
@@ -185,39 +202,36 @@ def unwrap_angle(angles):
 class PolarVector(PolarVectorGeneral):
 
     def calculate_angle_between(self, other_vector: PolarVectorGeneral):
-        vectors = [self, other_vector]
-        r_variables = [self.r, other_vector.r]
-        theta_variables = [self.theta, other_vector.theta]
-        phi_variables = [self.phi, other_vector.phi]
+        vec1 = self.v[:, 1] - self.v[:, 0]
+        vec2 = other_vector.v[:, 1] - other_vector.v[:, 0]
+        dot_product = np.dot(vec1, vec2)
+        angle = np.arccos(dot_product / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
+        return angle
 
-        check_r = [type(xx) in [list, np.ndarray] for xx in r_variables]
-        check_theta = [type(xx) in [list, np.ndarray] for xx in theta_variables]
-        check_phi = [type(xx) in [list, np.ndarray] for xx in phi_variables]
 
-        if not len(set(check_r))==1:
-            to_change = check_r.index(False)
-            vectors[to_change].r = np.zeros(len(r_variables[1 - to_change])) + r_variables[to_change]
+    def arb_rot_mat(self, vector: PolarVectorGeneral, angle):
+        vec1 = self.v[:, 1] - self.v[:, 0]
+        vec2 = vector.v[:, 1] - vector.v[:, 0]
+        cross_product = np.cross(vec1, vec2)
+        rotation_matrix = np.array([[np.cos(angle) + cross_product[0]**2*(1-np.cos(angle)), cross_product[0]*cross_product[1]*(1-np.cos(angle)) - cross_product[2]*np.sin(angle), cross_product[0]*cross_product[2]*(1-np.cos(angle)) + cross_product[1]*np.sin(angle)],
+                                [cross_product[1]*cross_product[0]*(1-np.cos(angle)) + cross_product[2]*np.sin(angle), np.cos(angle) + cross_product[1]**2*(1-np.cos(angle)), cross_product[1]*cross_product[2]*(1-np.cos(angle)) - cross_product[0]*np.sin(angle)],
+                                [cross_product[2]*cross_product[0]*(1-np.cos(angle)) - cross_product[1]*np.sin(angle), cross_product[2]*cross_product[1]*(1-np.cos(angle)) + cross_product[0]*np.sin(angle), np.cos(angle) + cross_product[2]**2*(1-np.cos(angle))]])
+        return rotation_matrix
+    
+    def rotate_with_rotation_matrix(self, rotation_matix):
+        self.v = np.dot(rotation_matix, self.v)
+        self.convert_to_spherical()
 
-        if not len(set(check_theta)) == 1:
-            to_change = check_theta.index(False)
-            vectors[to_change].theta = np.zeros(len(theta_variables[1 - to_change])) + theta_variables[to_change]
 
-        if not len(set(check_phi)) == 1:
-            to_change = check_phi.index(False)
-            vectors[to_change].phi = np.zeros(len(phi_variables[1 - to_change])) + phi_variables[to_change]
+class CartVector(PolarVector):
 
-        cart1 = vectors[0].convert_to_cartesian()
-        cart2 = vectors[1].convert_to_cartesian()
-        size = cart1.shape
-        dot = np.zeros(size[1])
-        for t in range(size[1]):
-            curdot = np.vdot(cart1[:, t], cart2[:, t])
-            dot[t] = curdot
-        # check for wrapping
-        angle = np.arccos(dot/(self.r * other_vector.r))
-        unwrap_angle(angle)
-        return angle, (cart1, cart2)
-        
+    def __init__(self, x: float, y: float, z: float):
+        self.v = np.array([[0, x], [0, y], [0, z]])
+        vec = self.v[:, 1] - self.v[:, 0]
+        self.r = np.sqrt(sum(vec**2))
+        self.theta = np.arccos(vec[2]/ self.r)
+        self.phi = np.arctan2(vec[1], vec[0])
+        self.pv = np.array([[self.r], [self.theta], [self.phi]])
 
 
 class GenMeshgrid:
