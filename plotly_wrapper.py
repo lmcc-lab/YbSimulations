@@ -1,4 +1,5 @@
 import plotly.graph_objs as go
+from plotly.subplots import make_subplots
 from ion_model import PolarVector
 import numpy as np
 from typing import Union, List, Tuple, Dict, Iterable
@@ -24,7 +25,9 @@ class VectorPlot:
         self.graph_objects_kwargs = []
         self.vector_kwargs = {}
 
-    def add_vector(self, vectors: Dict[str, PolarVector], kwargs: Dict[str, dict] = {}):
+    def add_vector(self, vectors: Dict[str, PolarVector], kwargs: Union[dict, Dict[str, dict]] = {}):
+        if list(kwargs.keys()) != list(vectors.keys()):
+            kwargs = {key: kwargs for key in vectors}
         self.vectors[1].update(vectors)
         self.vector_kwargs.update(kwargs)
     
@@ -56,7 +59,7 @@ class VectorPlot:
         self.array_objects.append(np.array([x, y, z]))
         self.graph_objects_kwargs.append(kwargs)
 
-    def plot(self):
+    def prepare_plot(self):
         # prepare for plotting
         axis_labels = ["x", "y", "z"]
         axis_labels_head = ["x", "y", "z", "u", "v", "w"]
@@ -88,11 +91,33 @@ class VectorPlot:
         for kw, array in zip(self.graph_objects_kwargs, self.array_objects):
             kw.update({"x": array[0], "y": array[1], "z": array[2]})
             self.graph_objects.append(go.Scatter3d(**kw))
-        
-        layout = go.Layout(title='3D Vector with Cone Arrow')
+    
+    def plot(self, **layout_kwargs):
+        layout = go.Layout(**layout_kwargs)
 
         fig = go.Figure(data=self.graph_objects, layout=layout)
         fig.update_scenes(xaxis_visible=False, yaxis_visible=False, zaxis_visible=False)
-
         return fig
-        
+    
+    # def plot_animation(self):
+
+class Subplots:
+
+    def __init__(self, **kwargs) -> None:
+        self.fig = make_subplots(**kwargs)
+    
+    def update_subplot(self, row, col, graph_objects, xaxis_kwargs={}, yaxis_kwargs={}, update_scenes_kwargs={}, **kwargs):
+        for ob in graph_objects:
+            self.fig.add_trace(ob, row=row, col=col, **kwargs)
+        self.fig.update_xaxes(row=row, col=col, **xaxis_kwargs)
+        self.fig.update_yaxes(row=row, col=col, **yaxis_kwargs)
+        self.fig.update_scenes(row=row, col=col, **update_scenes_kwargs)
+                
+    def layout(self, **kwargs):
+        self.fig.update_layout(**kwargs)
+
+
+
+
+
+    

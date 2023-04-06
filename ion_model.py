@@ -104,7 +104,7 @@ class PolarVectorGeneral:
         x = self.r * np.sin(self.phi) * np.cos(self.theta)
         y = self.r * np.sin(self.phi) * np.sin(self.theta)
         z = self.r * np.cos(self.phi)
-        self.v = np.array([[0, x], [0, y], [0, z]])
+        self.v = np.array([[0, x], [0, y], [0, z]], dtype=object)
 
     @staticmethod
     def Rx(theta):
@@ -175,26 +175,30 @@ class PolarVectorGeneral:
     def flip(self):
         self.v = np.flip(self.v, 1)
         self.convert_to_spherical()
-   
+    
 
 def unwrap_angle(angles):
     """ Assumed that the angle should be going in one direction at all times """
     direction = np.sign(angles[1:] - angles[:-1])
-    direction = np.abs((direction[1:] - direction[:-1]))
-    change_index = np.argwhere(direction == 2)[:, 0]
-    even = len(change_index) % 2 == 0
+    direction = np.insert(direction, 0, direction[0])
+    angles = angles * -1 * direction
+    
+    # direction = np.abs((direction[1:] - direction[:-1]))
+    # change_index = np.argwhere(direction == 2)[:, 0]
+    # even = len(change_index) % 2 == 0
 
-    if len(change_index) == 0:
-        return angles
-    skip = 1
-    for i, ind in enumerate(change_index):
-        if i < len(change_index) - 1 and skip:
-            angles[ind: change_index[i+1] + 1] = angles[ind] + (pi - angles[ind: change_index[i+1] + 1])
-            skip = 0
-        elif not even and not skip:
-            angles[ind:] = angles[ind] + (pi - angles[ind:])
-        elif not skip:
-            skip = 1
+    # if len(change_index) == 0:
+        # return angles
+    
+    # skip = 0
+    # for i, ind in enumerate(change_index):
+        # if i < len(change_index) - 1 and skip:
+            # angles[ind: change_index[i+1] + 1] = angles[ind] + (pi - angles[ind: change_index[i+1] + 1])
+            # skip = 0
+        # elif not even and not skip:
+            # angles[ind:] = angles[ind] + (pi - angles[ind:])
+        # elif not skip:
+            # skip = 1
 
     return angles
 
@@ -205,7 +209,10 @@ class PolarVector(PolarVectorGeneral):
         vec1 = self.v[:, 1] - self.v[:, 0]
         vec2 = other_vector.v[:, 1] - other_vector.v[:, 0]
         dot_product = np.dot(vec1, vec2)
+        # cross_product = np.cross(vec1, vec2)
         angle = np.arccos(dot_product / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
+        # RotMat = self.arb_rot_mat(other_vector, angle)
+        # norm_to_vec = cross_product @ RotMat
         return angle
 
 
@@ -266,15 +273,12 @@ def calculate_171_pop(detuning370: Union[np.array, float] = 0,
                       s_935: Union[np.array, float, None] = None,
                       make_mesh=True):
 
-    cart370 = None
-    cart935 = None
-
     yb171 = Yb171()
 
     if thetaBE370 is not None and b_mag is not None:
         pass
     elif e_field_370 is not None and b_field is not None:
-        thetaBE370, cart370 = b_field.calculate_angle_between(e_field_370)
+        thetaBE370 = b_field.calculate_angle_between(e_field_370)
         b_mag = b_field.r
     elif thetaBE370 is not None and zeeman is not None:
         pass
@@ -286,7 +290,7 @@ def calculate_171_pop(detuning370: Union[np.array, float] = 0,
     if thetaBE935 is not None and b_mag is not None:
         pass
     elif e_field_935 is not None and b_field is not None:
-        thetaBE935, cart935 = b_field.calculate_angle_between(e_field_935)
+        thetaBE935 = b_field.calculate_angle_between(e_field_935)
         b_mag = b_field.r
     elif thetaBE935 is not None and zeeman is not None:
         pass
@@ -339,7 +343,7 @@ def calculate_171_pop(detuning370: Union[np.array, float] = 0,
                         "pop": excited_pop_935},
                   "eta": eta}
 
-    return excited_pop, mesh, yb171, (cart370, cart935), other_data
+    return excited_pop, mesh, yb171, other_data
 
 
 def calculate_174_pop(detuning370: Union[np.array, float] = 0,
@@ -357,15 +361,12 @@ def calculate_174_pop(detuning370: Union[np.array, float] = 0,
                       s_935: Union[np.array, float, None] = None,
                       make_mesh=True):
 
-    cart370 = None
-    cart935 = None
-
     yb174 = Yb174()
 
     if thetaBE370 is not None and b_mag is not None:
         pass
     elif e_field_370 is not None and b_field is not None:
-        thetaBE370, cart370 = b_field.calculate_angle_between(e_field_370)
+        thetaBE370 = b_field.calculate_angle_between(e_field_370)
         b_mag = b_field.r
     elif thetaBE370 is not None and zeeman is not None:
         pass
@@ -377,7 +378,7 @@ def calculate_174_pop(detuning370: Union[np.array, float] = 0,
     if thetaBE935 is not None and b_mag is not None:
         pass
     elif e_field_935 is not None and b_field is not None:
-        thetaBE935, cart935 = b_field.calculate_angle_between(e_field_935)
+        thetaBE935 = b_field.calculate_angle_between(e_field_935)
         b_mag = b_field.r
     elif thetaBE935 is not None and zeeman is not None:
         pass
@@ -430,14 +431,14 @@ def calculate_174_pop(detuning370: Union[np.array, float] = 0,
                         "pop": excited_pop_935},
                   "eta": eta}
 
-    return excited_pop, mesh, yb174, (cart370, cart935), other_data
+    return excited_pop, mesh, yb174, other_data
 
 
 class GenerateTestData:
 
     def __init__(self, *args, **kwargs):
-        self.excited_pop_174, self.mesh_174, self.yb174, _, self.other_174 = calculate_174_pop(*args, **kwargs)
-        self.excited_pop_171, self.mesh_171, self.yb171, _, self.other_171 = calculate_171_pop(*args, **kwargs)
+        self.excited_pop_174, self.mesh_174, self.yb174, self.other_174 = calculate_174_pop(*args, **kwargs)
+        self.excited_pop_171, self.mesh_171, self.yb171, self.other_171 = calculate_171_pop(*args, **kwargs)
 
     def randomise(self, variance, seed=None):
 
@@ -455,8 +456,10 @@ class FitFreeParams:
     We will assume we have some known parameters (the ones were sweeping) and the rest are free or
     constant. Free parameters should be left blank, """
 
-    def __init__(self, x, y, x_variable_names, yb_model):
-        all_variables = ("thetaBE370", "s_370", "detuning370", "detuning935", "s_935", "zeeman", "thetaBE935")
+    def __init__(self, x, y, 
+                 x_variable_names, 
+                 yb_model,
+                 all_variables=("thetaBE370", "s_370", "detuning370", "detuning935", "s_935", "zeeman", "thetaBE935")):
         # check if x_variable_names is in all_variables
         if not all([name in all_variables for name in x_variable_names]):
             raise ValueError(f"x_variable_names must match exactly the names {all_variables}. Received names were {x_variable_names}.")
@@ -480,12 +483,19 @@ class FitFreeParams:
         listx.extend(list(args))
         kwargs = {name: listx[i] for i, name in enumerate(self.ordered_variable_names)}
         kwargs['make_mesh'] = False
-        y, _, _, _, _ = self.func(**kwargs)
+        y, _, _, _ = self.func(**kwargs)
         return y
     
-    def fit(self, p0=None):
-        popt, pcov = curve_fit(self.fit_func, self.x, self.y, p0=p0)
+    def fit(self, p0=None, **kwargs):
+        popt, pcov = curve_fit(self.fit_func, self.x, self.y, p0=p0, **kwargs)
         return popt, pcov
+
+
+def calc_171_pop_using_vectors(Er=0, Ephi=0, Etheta=0, Br=0, Bphi=0, Btheta=0, **model_kwargs):
+    E = PolarVector(Er, Etheta, Ephi)
+    B = PolarVector(Br, Btheta, Bphi)
+    excited_pop, mesh, yb171, other_data = calculate_171_pop(b_field=B, e_field_370=E, **model_kwargs)
+    return excited_pop, mesh, yb171, other_data
 
 
 
