@@ -4,6 +4,7 @@ from scipy.constants import h, c, hbar
 from scipy.constants import physical_constants
 from typing import Union
 from scipy.optimize import curve_fit
+from scipy.special import factorial
 import matplotlib.pyplot as plt
 
 
@@ -209,16 +210,13 @@ class PolarVector(PolarVectorGeneral):
         vec1 = self.v[:, 1] - self.v[:, 0]
         vec2 = other_vector.v[:, 1] - other_vector.v[:, 0]
         dot_product = np.dot(vec1, vec2)
-        # cross_product = np.cross(vec1, vec2)
         angle = np.arccos(dot_product / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
-        # RotMat = self.arb_rot_mat(other_vector, angle)
-        # norm_to_vec = cross_product @ RotMat
         return angle
 
 
     def arb_rot_mat(self, vector: PolarVectorGeneral, angle):
-        vec1 = self.v[:, 1] - self.v[:, 0]
-        vec2 = vector.v[:, 1] - vector.v[:, 0]
+        vec1 = np.array(self.v[:, 1] - self.v[:, 0], dtype=np.float64)
+        vec2 = np.array(vector.v[:, 1] - vector.v[:, 0], dtype=np.float64)
         cross_product = np.cross(vec1, vec2)
         rotation_matrix = np.array([[np.cos(angle) + cross_product[0]**2*(1-np.cos(angle)), cross_product[0]*cross_product[1]*(1-np.cos(angle)) - cross_product[2]*np.sin(angle), cross_product[0]*cross_product[2]*(1-np.cos(angle)) + cross_product[1]*np.sin(angle)],
                                 [cross_product[1]*cross_product[0]*(1-np.cos(angle)) + cross_product[2]*np.sin(angle), np.cos(angle) + cross_product[1]**2*(1-np.cos(angle)), cross_product[1]*cross_product[2]*(1-np.cos(angle)) - cross_product[0]*np.sin(angle)],
@@ -502,6 +500,10 @@ def calc_171_pop_using_vectors(Er=0, Ephi=0, Etheta=0, Br=0, Bphi=0, Btheta=0, *
 def Lorentzian(x, x0, Gamma):
     half_Gamma = Gamma/2
     return 1/np.pi * half_Gamma / ((x-x0)**2 + half_Gamma**2)
+
+
+def poissonian(k, lam):
+    return np.exp(-lam) * lam ** k / factorial(k)
 
 
 
