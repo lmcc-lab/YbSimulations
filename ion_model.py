@@ -95,17 +95,22 @@ class Yb174(Yb):
 
 class PolarVectorGeneral:
     def __init__(self,
-                 r: float,
-                 theta: float,
-                 phi: float):
-        self.r = r
-        self.theta = theta
-        self.phi = phi
-        self.pv = np.array([[self.r], [self.theta], [self.phi]])
-        x = self.r * np.sin(self.phi) * np.cos(self.theta)
-        y = self.r * np.sin(self.phi) * np.sin(self.theta)
-        z = self.r * np.cos(self.phi)
-        self.v = np.array([[0, x], [0, y], [0, z]], dtype=object)
+                 r: Union[float, None] = None,
+                 theta: Union[float, None] = None,
+                 phi: Union[float, None] = None,
+                 cartesian: Union[tuple, None] = None):
+        if cartesian is not None:
+            x, y, z = cartesian
+            self.v = np.array([[0, x], [0, y], [0, z]], dtype=object)
+            self.convert_to_spherical()
+        elif any([r is None, theta is None, phi is None]):
+            raise ValueError
+        else:
+            self.r = r
+            self.theta = theta
+            self.phi = phi
+            self.pv = np.array([[self.r], [self.theta], [self.phi]])
+            self.convert_to_cartesian()
 
     @staticmethod
     def Rx(theta):
@@ -143,6 +148,10 @@ class PolarVectorGeneral:
 
     def change_mag(self, length):
         self.r += length
+        self.convert_to_cartesian()
+
+    def scale_mag(self, scale):
+        self.r *= scale
         self.convert_to_cartesian()
 
     def convert_to_cartesian(self):

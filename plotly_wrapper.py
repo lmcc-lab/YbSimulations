@@ -8,15 +8,15 @@ from pprint import pprint
 
 class VectorPlot:
 
-    def __init__(self) -> None:
+    def __init__(self, axis_size=3) -> None:
         
-        self.x_axis = PolarVector(3, 0, np.pi/2)
-        self.y_axis = PolarVector(3, np.pi/2, np.pi/2)
-        self.z_axis = PolarVector(3, 0, 0)
+        self.x_axis = PolarVector(axis_size, 0, np.pi/2)
+        self.y_axis = PolarVector(axis_size, np.pi/2, np.pi/2)
+        self.z_axis = PolarVector(axis_size, 0, 0)
 
-        self.x_axis.translate(np.array([[-1.5, -1.5], [0, 0], [0, 0]]))
-        self.y_axis.translate(np.array([[0, 0], [-1.5, -1.5], [0, 0]]))
-        self.z_axis.translate(np.array([[0, 0], [0, 0], [-1.5, -1.5]]))
+        self.x_axis.translate(np.array([[-axis_size/2, -axis_size/2], [0, 0], [0, 0]]))
+        self.y_axis.translate(np.array([[0, 0], [-axis_size/2, -axis_size/2], [0, 0]]))
+        self.z_axis.translate(np.array([[0, 0], [0, 0], [-axis_size/2, -axis_size/2]]))
 
         self.vectors = [(self.x_axis, self.y_axis, self.z_axis), {}]
         self.colors = None
@@ -41,6 +41,28 @@ class VectorPlot:
                     vector.rotate_about_x(theta)
         for i, array in enumerate(self.array_objects):
             self.array_objects[i] = PolarVector.Rx(theta) @ array
+    
+    def rotate_about_y(self, theta=np.pi/2):
+        for i, group in enumerate(self.vectors):
+            if i == 0:
+                for axis_vec in group:
+                    axis_vec.rotate_about_y(theta)
+            else:
+                for vector in group.values():
+                    vector.rotate_about_y(theta)
+        for i, array in enumerate(self.array_objects):
+            self.array_objects[i] = PolarVector.Ry(theta) @ array
+    
+    def rotate_about_z(self, theta=np.pi/2):
+        for i, group in enumerate(self.vectors):
+            if i == 0:
+                for axis_vec in group:
+                    axis_vec.rotate_about_z(theta)
+            else:
+                for vector in group.values():
+                    vector.rotate_about_z(theta)
+        for i, array in enumerate(self.array_objects):
+            self.array_objects[i] = PolarVector.Rz(theta) @ array
     
     def add_arc_between_vecs(self, vec1: PolarVector, vec2: PolarVector, **kwargs):
         arc = PolarVector(0.5, vec1.theta, vec1.phi)
