@@ -101,7 +101,10 @@ class PolarVectorGeneral:
                  cartesian: Union[tuple, None] = None):
         if cartesian is not None:
             x, y, z = cartesian
-            self.v = np.array([[0, x], [0, y], [0, z]], dtype=object)
+            self.v = np.array([[0, x], [0, y], [0, z]], dtype=np.float64)
+            self.r = None
+            self.theta = None
+            self.phi = None
             self.convert_to_spherical()
         elif any([r is None, theta is None, phi is None]):
             raise ValueError
@@ -132,6 +135,9 @@ class PolarVectorGeneral:
                        [np.sin(theta),  np.cos(theta), 0], 
                        [0,          0,                 1]])
         return Rz
+    
+    def update_pv(self):
+        self.pv = np.array([[self.r], [self.theta], [self.phi]])
 
     def update(self, r, theta, phi):
         self.r = r
@@ -141,18 +147,22 @@ class PolarVectorGeneral:
     def rotate_theta_by(self, radians):
         self.theta += radians
         self.convert_to_cartesian()
+        self.update_pv()
 
     def rotate_phi_by(self, radians):
         self.phi += radians
         self.convert_to_cartesian()
+        self.update_pv()
 
     def change_mag(self, length):
         self.r += length
         self.convert_to_cartesian()
+        self.update_pv()
 
     def scale_mag(self, scale):
         self.r *= scale
         self.convert_to_cartesian()
+        self.update_pv()
 
     def convert_to_cartesian(self):
         x = self.r * np.sin(self.phi) * np.cos(self.theta)
@@ -163,8 +173,8 @@ class PolarVectorGeneral:
     def convert_to_spherical(self):
         vec = self.v[:, 1] - self.v[:, 0]
         self.r = np.sqrt(sum(vec**2))
-        self.theta = np.arccos(vec[2]/ self.r)
-        self.phi = np.arctan2(vec[1], vec[0])
+        self.theta = np.arctan2(vec[1], vec[0])
+        self.phi = np.arctan2(np.sqrt(vec[0]**2 + vec[1]**2), vec[2])
         self.pv = np.array([[self.r], [self.theta], [self.phi]])
     
     def rotate_about_x(self, theta):

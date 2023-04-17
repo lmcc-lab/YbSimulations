@@ -1,5 +1,14 @@
 # Atomic Checklist
 Use Yb174. In the order I would do them on a given day
+- **RF**
+- **Vaccum**
+- **Voltages well**
+- **laser frequency** iF THERES A PROBLEM MAYBE TRY DETUNING FURTHER
+- **laser power**
+- **Saturation power**
+- **Beam weist**
+- **Rayleigh Range**
+
 - **Check beams overlap**. Use beam profiler in two different positions to check beam overlap.
 - **Make sure beams are going through center of lens**. Set the shuttle position to the mirror position (864) and check the lasers are going through the center of the lens.
 - **Check cooling laser polarisation**. Should be horizontal with B field (For 174 only).
@@ -9,6 +18,7 @@ Use Yb174. In the order I would do them on a given day
 - **Compensating for external mangetic fields**. Henle resonance; turn off main coil (z axis), then minimize counts on all three compensation coils independently. Counts should drop considerably (in the thousands). Turn back on main coil, counts should go back up to where it was if not higher.
 - **935 saturation**. Turn down 935 power and measure counts. It should be set to saturate so a small change in power doesn't change counts.
 - **Check beam pointing**. Move lens position to maximise counts/doppler saturation parameter.
+- **Check beam spot size on ion**. Move lens out of focus, recording how far it's been moved. Then move x-y to get an idea of the spot size. Then begin moving back into focus and past 
 - **B field alignment using Raman beams**. If the polarisation of the Raman beams is set correctly to $\sigma_-$, $\sigma_+$ with the correct detunings, then when you have both Raman beams hitting the ion it should fluoresce. When only one is on then it should go completely dark. 
 - **Run Electrode Compensation code**. Compensate for stray electric fields.
 - **370 power saturation**. Measure the saturation power of cooling laser. Use lens position to maximise it.  

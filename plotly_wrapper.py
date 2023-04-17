@@ -80,6 +80,9 @@ class VectorPlot:
         kwargs.update({"mode": mode})
         self.array_objects.append(np.array([x, y, z]))
         self.graph_objects_kwargs.append(kwargs)
+    
+    def reset_plot(self):
+        self.graph_objects = []
 
     def prepare_plot(self):
         # prepare for plotting
@@ -114,7 +117,7 @@ class VectorPlot:
             kw.update({"x": array[0], "y": array[1], "z": array[2]})
             self.graph_objects.append(go.Scatter3d(**kw))
     
-    def plot(self, **layout_kwargs):
+    def show(self, **layout_kwargs):
         layout = go.Layout(**layout_kwargs)
 
         fig = go.Figure(data=self.graph_objects, layout=layout)

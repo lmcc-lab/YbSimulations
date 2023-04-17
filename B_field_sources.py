@@ -1,22 +1,36 @@
 import magpylib as magpy
 from magpylib.current import Loop
+from magpylib import Collection
 import numpy as np
 import matplotlib.pyplot as plt
 from ion_model import PolarVector
 import plotly.graph_objects as go
 
 
-def create_coil(num_loops, coil_diameter, loop_spacing, current=1):
+def create_coil(num_loops, coil_diameter, loop_spacing, current=1, label='coil'):
     """
     
+    num_loops: int, Number of loops
     coil_diameter: [mm]
     loop_spacing: [mm]
     """
-    coil = magpy.Collection(style_label='coil1')
+    coil = magpy.Collection(style_label=label)
     for z in np.linspace(-loop_spacing * num_loops, loop_spacing * num_loops, num_loops):
         coil.add(Loop(current=current, diameter=coil_diameter, position=(0,0,z)))
     return coil
 
+
+def change_coil_current(coil: Collection, current):
+    for loop in coil.children:
+        loop.current = current
+
+
+def make_coil_dict(coils):
+    return {coil.style.label: coil for coil in coils.collections_all}
+
+
+def get_current_in_coil(coil):
+    return coil.children[0].current
 
 def add_uniform_field(vector: PolarVector, B_field: np.ndarray):
     vec = vector.v[:, 1].astype(np.float64)
@@ -25,20 +39,19 @@ def add_uniform_field(vector: PolarVector, B_field: np.ndarray):
 
 
 def experimental_setup():
-    coilx = create_coil(20, 100, 0.1)
-    coily = coilx.copy(position=(0, 300, 0))
-    coil_main = create_coil(20, 100, 0.1, current=1.9)
-    coil_main.move((300, 0, 0))
-    # coilx.copy(position=(-300, 0, 0))
+    coilx = create_coil(20, 100, 0.1, label='x')
+    coily = create_coil(20, 100, 0.1, label='y')
+    coil_main = create_coil(20, 100, 0.1, current=1.9, label='main')
+    coilz = create_coil(20, 300, 0.1, current=-1, label='z')
 
+    coil_main.move((300, 0, 0))
+    coily.move((0, 300, 0))
     coilx.move((-300, 0, 0))
+    coilz.move((0, 0, -150))
 
     coily.rotate_from_angax(90, 'x', start=0)
     coilx.rotate_from_angax(90, 'y', start=0)
     coil_main.rotate_from_angax(-90, 'y', start=0)
-
-    coilz = create_coil(20, 300, 0.1, current=-1)
-    coilz.move((0, 0, -150))
 
     all_coils = coilx + coily + coil_main + coilz #+ external_field
     return all_coils
