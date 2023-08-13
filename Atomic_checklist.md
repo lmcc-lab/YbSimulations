@@ -6,7 +6,7 @@ Use Yb174. In the order I would do them on a given day
 - **laser frequency** iF THERES A PROBLEM MAYBE TRY DETUNING FURTHER
 - **laser power**
 - **Saturation power**
-- **Beam weist**
+- **Beam waist**
 - **Rayleigh Range**
 
 - **Check beams overlap**. Use beam profiler in two different positions to check beam overlap.
