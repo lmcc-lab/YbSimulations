@@ -341,7 +341,7 @@ def calculate_171_pop(detuning370: Union[np.array, float] = 0,
     rabi_370 = yb171.rabi_freq(mesh.s0_370, yb171.gamma_2S12_2P12)
     eff_linewidth_370 = yb171.effective_linewidth(mesh.thetaBE370, rabi_370, mesh.zeeman, yb171.gamma_2S12_2P12)
     excited_pop_370 = yb171.excited_population_no_leakage(rabi_370, eff_linewidth_370, mesh.thetaBE370, mesh.detuning370)
-
+  
     rabi_935 = yb171.rabi_freq(mesh.s0_935, yb171.gamma_2D32_3D3212)
     eff_linewidth_935 = yb171.effective_linewidth(mesh.thetaBE935, rabi_935, mesh.zeeman, yb171.gamma_2D32_3D3212)
     excited_pop_935 = yb171.excited_population_no_leakage(rabi_935, eff_linewidth_935, mesh.thetaBE935, mesh.detuning935)
