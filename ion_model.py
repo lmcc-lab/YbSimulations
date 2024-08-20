@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 @dataclass
 class YbConstants:
-    gamma_2S12_2P12_Hz: float = 19.6e6    # 1/s
+    gamma_2S12_2P12_Hz: float = 19.7e6    # 1/s
     lambda_2S12_2P12: float = 369.5e-9          # m
     lambda_2D32_3D3212: float = 935.2e-9        # m
     gamma_2D32_3D3212_Hz: float = 4.2e6         # 1/ s
@@ -37,7 +37,7 @@ class Yb(YbConstants):
         
     def __post_init__(self):
         self.gamma_2S12_2P12 = self.gamma_2S12_2P12_Hz * 2 * np.pi    # radians/s
-        self.gamma_2D32_3D3212 = 2 * pi * self.gamma_2D32_3D3212   # radians / s
+        self.gamma_2D32_3D3212 = 2 * pi * self.gamma_2D32_3D3212_Hz   # radians / s
         self.mu_b = physical_constants['Bohr magneton'][0] / hbar  # kg m^2 s^-2
         self.branch_ratio_2P12_2D32 = 1 - self.branch_ratio_3D3212_2S12
         self.hyperfine_splitting_2S12 = 2 * pi * self.hyperfine_splitting_2S12_Hz # radians/s
@@ -519,8 +519,8 @@ class FitFreeParams:
         y, _, _, _ = self.func(**kwargs)
         return y
     
-    def fit(self, p0=None, **kwargs):
-        popt, pcov = curve_fit(self.fit_func, self.x, self.y, p0=p0, **kwargs)
+    def fit(self, p0=None, sigma=None, **kwargs):
+        popt, pcov = curve_fit(self.fit_func, self.x, self.y, p0=p0, sigma=sigma, **kwargs)
         return popt, pcov
 
 
