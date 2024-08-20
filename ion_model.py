@@ -6,37 +6,55 @@ from typing import Union
 from scipy.optimize import curve_fit
 from scipy.special import factorial
 import matplotlib.pyplot as plt
+from dataclasses import dataclass
 
 
-class Yb:
-    def __init__(self):
-        self.gamma_2S12_2P12 = 2 * pi * 19.6e6    # radians/s
-        self.lambda_2S12_2P12 = 369.5e-9          # m
-        self.lambda_2D32_3D3212 = 935.2e-9        # m
-        self.gamma_2D32_3D3212 = 2 * pi * 4.2e6   # radians / s
+@dataclass
+class YbConstants:
+    gamma_2S12_2P12_Hz: float = 19.6e6    # 1/s
+    lambda_2S12_2P12: float = 369.5e-9          # m
+    lambda_2D32_3D3212: float = 935.2e-9        # m
+    gamma_2D32_3D3212_Hz: float = 4.2e6         # 1/ s
+    zeeman_P_state_proportion: float = 1/3
+    zeeman_S_state_proportion: float = 1
+    branch_ratio_3D3212_2S12: float = 0.982
+    hyperfine_splitting_2S12_Hz = 12.643e9  # 1/s
+    hyperfine_splitting_2P12_Hz = 2.105e9   # 1/s
+    hyperfine_splitting_2D32_Hz = 0.86e9    # radians/s
+    hyperfine_splitting_3D32_Hz = 2.21e9    # radians/s
+
+    optimal_thetaBE = np.arccos(1/np.sqrt(3))
+
+    excited_lifetime_2P12 = 8.1e-9  #s
+    excited_lifetime_3D32 = 37.7e-9  #s
+    excited_lifetime_2D32 = 52.7e-3  #s
+
+    zeeman_shift_Hz = 3.5e6
+
+
+@dataclass
+class Yb(YbConstants):
+        
+    def __post_init__(self):
+        self.gamma_2S12_2P12 = self.gamma_2S12_2P12_Hz * 2 * np.pi    # radians/s
+        self.gamma_2D32_3D3212 = 2 * pi * self.gamma_2D32_3D3212   # radians / s
         self.mu_b = physical_constants['Bohr magneton'][0] / hbar  # kg m^2 s^-2
-        self.zeeman_P_state_proportion = 1/3
-        self.zeeman_S_state_proportion = 1
-
-        self.branch_ratio_3D3212_2S12 = 0.982
         self.branch_ratio_2P12_2D32 = 1 - self.branch_ratio_3D3212_2S12
-        self.hyperfine_splitting_2S12 = 2 * pi * 12.643e9  # radians/s
-        self.hyperfine_splitting_2P12 = 2 * pi * 2.105e9   # radians/s
-        self.hyperfine_splitting_2D32 = 2 * pi * 0.86e9    # radians/s
-        self.hyperfine_splitting_3D32 = 2 * pi * 2.21e9    # radians/s
+        self.hyperfine_splitting_2S12 = 2 * pi * self.hyperfine_splitting_2S12_Hz # radians/s
+        self.hyperfine_splitting_2P12 = 2 * pi * self.hyperfine_splitting_2P12_Hz   # radians/s
+        self.hyperfine_splitting_2D32 = 2 * pi * self.hyperfine_splitting_2D32_Hz    # radians/s
+        self.hyperfine_splitting_3D32 = 2 * pi * self.hyperfine_splitting_3D32_Hz    # radians/s
 
         self.optimal_thetaBE = np.arccos(1/np.sqrt(3))
 
         self.I370sat = pi * h * c * self.gamma_2S12_2P12 / ( 3 * self.lambda_2S12_2P12 ** 3)  # W/m^2
         self.I935sat = pi * h * c * self.gamma_2D32_3D3212 / (3 * self.lambda_2D32_3D3212 ** 3)  # W/m^2
 
-        self.excited_lifetime_2P12 = 8.1e-9  #s
-        self.excited_lifetime_3D32 = 37.7e-9  #s
-        self.excited_lifetime_2D32 = 52.7e-3  #s
-
         self.Gamma_2P12 = 1/self.excited_lifetime_2P12
         self.Gamma_3D32 = 1/self.excited_lifetime_3D32
         self.Gamma_2D32 = 1/self.excited_lifetime_2D32
+
+        self.zeeman_shift_Hz = 3.5e6
 
     def zeeman_shift(self, B, g):
         return g * self.mu_b * B
@@ -59,8 +77,6 @@ class Yb:
     def eta(self, excited_pop_D32, epsilon=1e-8):
         return self.branch_ratio_2P12_2D32 * self.gamma_2S12_2P12 / \
                (self.branch_ratio_3D3212_2S12 * self.gamma_2D32_3D3212) * 1 / (excited_pop_D32 + epsilon)
-
-
 
 
 
