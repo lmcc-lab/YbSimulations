@@ -7,6 +7,7 @@ from scipy.optimize import curve_fit
 from scipy.special import factorial
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
+import inspect
 
 
 @dataclass
@@ -529,6 +530,74 @@ def calc_171_pop_using_vectors(Er=0, Ephi=0, Etheta=0, Br=0, Bphi=0, Btheta=0, *
     B = PolarVector(Br, Btheta, Bphi)
     excited_pop, mesh, yb171, other_data = calculate_171_pop(b_field=B, e_field_370=E, **model_kwargs)
     return excited_pop, mesh, yb171, other_data
+
+
+
+class FitCounts:
+
+    def __init__(self, independent_variables: dict, counts: np.ndarray, fit_function):
+        """
+        This class handles fitting any function with many variables, where you can simply input what
+        variables are being held constant (independent variables), while the rest are treated as free
+        parameters to be fitted. 
+        """
+        all_variables = inspect.getargspec(fit_function).args
+        if 'self' in all_variables:
+            all_variables.remove('self')
+
+        names_of_independent_variables = list(independent_variables.keys())
+
+        if not all([name in all_variables for name in names_of_independent_variables]):
+            raise ValueError(f"x_variable_names must match exactly the names {all_variables}. Received names were {names_of_independent_variables}.")
+        
+        # Determine the free parameters to be fitted
+        self.free_params = [var for var in all_variables if var not in names_of_independent_variables]
+        
+        self.counts = counts
+
+        self.function = fit_function
+        self.independent_variables = independent_variables
+    
+    def fit_func(self, *free_params):
+        """
+        This function wraps the original function to use with curve_fit.
+        It holds certain variables constant and lets the free parameters vary.
+        
+        :param free_params: The free parameters to be fitted.
+        :return: The function evaluated with the free parameters and fixed independent variables.
+        """
+        # Combine free parameters with fixed independent variables
+        free_params = list(free_params)
+        free_params.pop(0)
+        all_params = {**self.independent_variables}
+        all_params.update(dict(zip(self.free_params, free_params)))
+        
+        return self.function(**all_params)
+
+    
+    def fit(self, p0: dict=None, sigma: list=None, **curve_fit_kwargs):
+        """
+        Fits the function to the data using curve_fit.
+        
+        :param p0: Initial guess for the free parameters.
+        :param sigma: Optional uncertainties for the dependent variable.
+        :param curve_fit_kwargs: Additional arguments to pass to curve_fit.
+        :return: Optimal values for the free parameters and the covariance matrix.
+        """
+        # Initial guess for the free parameters
+        if p0 is None:
+            p0 = [1.0] * len(self.free_params)
+        else:
+            p0 = [p0[name] for name in self.free_params]
+
+        # Perform the curve fitting
+        popt, pcov = curve_fit(self.fit_func, np.arange(len(self.counts)), self.counts, p0=p0, sigma=sigma, **curve_fit_kwargs)
+        popt = {free_param_name: pop for free_param_name, pop in zip(self.free_params, popt)}
+        all_params = {**self.independent_variables}
+        error = {free_param_name: er for free_param_name, er in zip(self.free_params, np.sqrt(np.diag(pcov)))}
+        all_params.update(popt)
+        self.all_params = all_params
+        return popt, error, pcov
 
 
 
