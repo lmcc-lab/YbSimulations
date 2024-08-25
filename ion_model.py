@@ -731,6 +731,74 @@ def counts_174(efficiency, *args, **kwargs):
     excited_pop, mesh, yb174, other_data = calculate_174_pop(*args, **kwargs)
     return excited_pop * yb174.gamma_2S12_2P12 * efficiency, mesh, yb174, other_data 
 
+class FitCounts:
+
+    def __init__(self, independent_variables: dict, counts: np.ndarray, fit_function):
+        """
+        This class handles fitting any function with many variables, where you can simply input what
+        variables are being held constant (independent variables), while the rest are treated as free
+        parameters to be fitted. 
+        """
+        all_variables = inspect.getargspec(fit_function).args
+        if 'self' in all_variables:
+            all_variables.remove('self')
+
+        names_of_independent_variables = list(independent_variables.keys())
+
+        if not all([name in all_variables for name in names_of_independent_variables]):
+            raise ValueError(f"x_variable_names must match exactly the names {all_variables}. Received names were {names_of_independent_variables}.")
+        
+        # Determine the free parameters to be fitted
+        self.free_params = [var for var in all_variables if var not in names_of_independent_variables]
+        
+        self.counts = counts
+
+        self.function = fit_function
+        self.independent_variables = independent_variables
+    
+    def fit_func(self, *free_params):
+        """
+        This function wraps the original function to use with curve_fit.
+        It holds certain variables constant and lets the free parameters vary.
+        
+        :param free_params: The free parameters to be fitted.
+        :return: The function evaluated with the free parameters and fixed independent variables.
+        """
+        # Combine free parameters with fixed independent variables
+        free_params = list(free_params)
+        free_params.pop(0)
+        all_params = {**self.independent_variables}
+        all_params.update(dict(zip(self.free_params, free_params)))
+        
+        return self.function(**all_params)
+
+    
+    def fit(self, p0: dict=None, sigma: list=None, **curve_fit_kwargs):
+        """
+        Fits the function to the data using curve_fit.
+        
+        :param p0: Initial guess for the free parameters.
+        :param sigma: Optional uncertainties for the dependent variable.
+        :param curve_fit_kwargs: Additional arguments to pass to curve_fit.
+        :return: Optimal values for the free parameters and the covariance matrix.
+        """
+        # Initial guess for the free parameters
+        if p0 is None:
+            p0 = [1.0] * len(self.free_params)
+        else:
+            p0 = [p0[name] for name in self.free_params]
+
+        # Perform the curve fitting
+        popt, pcov = curve_fit(self.fit_func, np.arange(len(self.counts)), self.counts, p0=p0, sigma=sigma, **curve_fit_kwargs)
+        popt = {free_param_name: pop for free_param_name, pop in zip(self.free_params, popt)}
+        all_params = {**self.independent_variables}
+        error = {free_param_name: er for free_param_name, er in zip(self.free_params, np.sqrt(np.diag(pcov)))}
+        all_params.update(popt)
+        self.all_params = all_params
+        return popt, error, pcov
+
+
+
 def Lorentzian(x, x0, Gamma):
     half_Gamma = Gamma/2
     return 1/np.pi * half_Gamma / ((x-x0)**2 + half_Gamma**2)
