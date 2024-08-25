@@ -2,11 +2,12 @@ import numpy as np
 from numpy import pi as pi
 from scipy.constants import h, c, hbar
 from scipy.constants import physical_constants
-from typing import Union
+from typing import Union, Tuple, List
 from scipy.optimize import curve_fit
 from scipy.special import factorial
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
+import inspect
 
 
 @dataclass
@@ -54,8 +55,6 @@ class Yb(YbConstants):
         self.Gamma_3D32 = 1/self.excited_lifetime_3D32
         self.Gamma_2D32 = 1/self.excited_lifetime_2D32
 
-        self.zeeman_shift_Hz = 3.5e6
-
     def zeeman_shift(self, B, g):
         return g * self.mu_b * B
 
@@ -94,6 +93,69 @@ class Yb171(Yb):
         sin2_thetaBE = np.sin(thetaBE) ** 2
         return 3/4 * cos2_thetaBE * sin2_thetaBE / (1 + 3 * cos2_thetaBE) * (rabi_freq ** 2 / 3) / \
                (detuning**2 + effective_linewidth)
+    
+    def counts(self, 
+               photon_collection_efficiency, 
+               power_370_W, 
+               power_370_sat_W, 
+               E370theta_rad, 
+               EO_370_voltage,
+               EO_angle_offset,
+               Btheta_rad, 
+               Bphi_rad, 
+               E935theta_rad, 
+               E935phi_rad,
+               power_935_W,
+               power_935_sat_W,
+               zeeman_shift_MHz,
+               detuning_370_MHz,
+               detuning_935_MHz):
+        """
+        Calculate the prediced counts from the ion given all of the possible 
+        experimental configurations. This method will also acts as the fitting
+        function for all other experiments.
+
+        @params
+        photon_collection_efficiency: float, the efficiency of photon collection (0<=eta<=1)
+        power_370_W: float, the power being sent to the ion in Watts
+        power_370_sat_W: float, the saturation power of the ion in Watts
+        E370theta_rad: float, The theta Euler angle of the 370 laser electric field in radians
+        EO_370_voltage: float, The Polarisation EO for the 370 laser controls the phi angle of the electric
+                               field (the polarisation). This voltage is between 0 and 1, and rotates the 
+                               polarisation from 0 to pi radians. This voltage is converted to E370phi
+        EO_angle_offset: float, The input angle into the EO offsets the phi angle initially, so this is added to 
+                                E370 phi, and left as a free variable.
+        E935theta_rad: float, the theta Euler angle of the 935 laser electric field in radians
+        E935phi_rad: float, the phi Euler angle of the 935 laser electric field in radians
+        Btheta_rad: float, the theta Euler angle of the B field vector at the ions position in radians
+        Bphi_rad: float, the phi Euler angle of the B field vector at the ions position in radians
+        zeeman_shift_MHz: float, the magnetic field induced Zeeman shift in units of MHz
+        detuning_370_MHz: float, the detuning of the 370 laser from the excited state in units of MHz
+        detuning_935_MHz: float, the detuning of the 935 laser from the excited state in units of MHz
+        """
+        E370phi_rad = EO_370_voltage * np.pi + EO_angle_offset
+        s_370 = self.s0(power_370_W, power_370_sat_W) # converting this into a saturation parameter
+        s_935 = self.s0(power_935_W, power_935_sat_W) # Converting this into a saturation parameter
+        E370 = PolarVector(1, E370theta_rad, E370phi_rad) # Using vectors to describe the E and B fields
+        E935 = PolarVector(1, E935theta_rad, E935phi_rad) #
+        B = PolarVector(1, Btheta_rad, Bphi_rad)          #
+        zeeman_shift = 2 * np.pi * zeeman_shift_MHz * 1e6  # Convering to rad/s
+        detuning_370 = 2 * np.pi * detuning_370_MHz * 1e6  # converting to rad/s
+        detuning_935 = 2 * np.pi * detuning_935_MHz * 1e6  # converting to rad/s
+        excited_pop, mesh, yb171, other_data = calculate_171_pop(b_field=B, 
+                                                                 e_field_370=E370,
+                                                                 e_field_935=E935,
+                                                                 s_370=s_370, 
+                                                                 s_935=s_935, 
+                                                                 zeeman=zeeman_shift,
+                                                                 detuning370=detuning_370,
+                                                                 detuning935=detuning_935, make_mesh=False)
+        
+        total_counts_per_s = excited_pop * self.gamma_2S12_2P12 * photon_collection_efficiency
+        return total_counts_per_s
+
+
+
 
 
 class Yb174(Yb):
@@ -107,6 +169,66 @@ class Yb174(Yb):
 
     def excited_population_no_leakage(self, rabi_freq, effective_linewidth, detuning):
         return 1/2 * (rabi_freq**2 / 6) / (detuning ** 2 + effective_linewidth)
+
+    def counts(self, 
+               photon_collection_efficiency, 
+               power_370_W, 
+               power_370_sat_W, 
+               E370theta_rad, 
+               EO_370_voltage,
+               EO_angle_offset,
+               Btheta_rad, 
+               Bphi_rad, 
+               E935theta_rad, 
+               E935phi_rad,
+               power_935_W,
+               power_935_sat_W,
+               zeeman_shift_MHz,
+               detuning_370_MHz,
+               detuning_935_MHz):
+        """
+        Calculate the prediced counts from the ion given all of the possible 
+        experimental configurations. This method will also acts as the fitting
+        function for all other experiments.
+
+        @params
+        photon_collection_efficiency: float, the efficiency of photon collection (0<=eta<=1)
+        power_370_W: float, the power being sent to the ion in Watts
+        power_370_sat_W: float, the saturation power of the ion in Watts
+        E370theta_rad: float, The theta Euler angle of the 370 laser electric field in radians
+        EO_370_voltage: float, The Polarisation EO for the 370 laser controls the phi angle of the electric
+                               field (the polarisation). This voltage is between 0 and 1, and rotates the 
+                               polarisation from 0 to pi radians. This voltage is converted to E370phi
+        EO_angle_offset: float, The input angle into the EO offsets the phi angle initially, so this is added to 
+                                E370 phi, and left as a free variable.
+        E935theta_rad: float, the theta Euler angle of the 935 laser electric field in radians
+        E935phi_rad: float, the phi Euler angle of the 935 laser electric field in radians
+        Btheta_rad: float, the theta Euler angle of the B field vector at the ions position in radians
+        Bphi_rad: float, the phi Euler angle of the B field vector at the ions position in radians
+        zeeman_shift_MHz: float, the magnetic field induced Zeeman shift in units of MHz
+        detuning_370_MHz: float, the detuning of the 370 laser from the excited state in units of MHz
+        detuning_935_MHz: float, the detuning of the 935 laser from the excited state in units of MHz
+        """
+        E370phi_rad = EO_370_voltage * np.pi + EO_angle_offset
+        s_370 = self.s0(power_370_W, power_370_sat_W) # converting this into a saturation parameter
+        s_935 = self.s0(power_935_W, power_935_sat_W) # Converting this into a saturation parameter
+        E370 = PolarVector(1, E370theta_rad, E370phi_rad) # Using vectors to describe the E and B fields
+        E935 = PolarVector(1, E935theta_rad, E935phi_rad) #
+        B = PolarVector(1, Btheta_rad, Bphi_rad)          #
+        zeeman_shift = 2 * np.pi * zeeman_shift_MHz * 1e6  # Convering to rad/s
+        detuning_370 = 2 * np.pi * detuning_370_MHz * 1e6  # converting to rad/s
+        detuning_935 = 2 * np.pi * detuning_935_MHz * 1e6  # converting to rad/s
+        excited_pop, mesh, yb171, other_data = calculate_174_pop(b_field=B, 
+                                                                 e_field_370=E370,
+                                                                 e_field_935=E935,
+                                                                 s_370=s_370, 
+                                                                 s_935=s_935, 
+                                                                 zeeman=zeeman_shift,
+                                                                 detuning370=detuning_370,
+                                                                 detuning935=detuning_935, make_mesh=False)
+        
+        total_counts_per_s = excited_pop * self.gamma_2S12_2P12 * photon_collection_efficiency
+        return total_counts_per_s
 
 
 class PolarVectorGeneral:
@@ -128,7 +250,7 @@ class PolarVectorGeneral:
             self.r = r
             self.theta = theta
             self.phi = phi
-            self.pv = np.array([[self.r], [self.theta], [self.phi]])
+            self.pv = np.array([[self.r], [self.theta], [self.phi]], dtype=object)
             self.convert_to_cartesian()
 
     @staticmethod
@@ -184,7 +306,7 @@ class PolarVectorGeneral:
         x = self.r * np.sin(self.phi) * np.cos(self.theta)
         y = self.r * np.sin(self.phi) * np.sin(self.theta)
         z = self.r * np.cos(self.phi)
-        self.v = np.array([[0, x], [0, y], [0, z]])
+        self.v = np.array([[0, x], [0, y], [0, z]], dtype=object)
     
     def convert_to_spherical(self):
         vec = self.v[:, 1] - self.v[:, 0]
@@ -304,7 +426,7 @@ def calculate_171_pop(detuning370: Union[np.array, float] = 0,
                       zeeman: Union[np.array, float, None] = None,
                       s_370: Union[np.array, float, None] = None,
                       s_935: Union[np.array, float, None] = None,
-                      make_mesh=True):
+                      make_mesh=True) -> Tuple[np.ndarray, np.ndarray, Yb171, dict]:
 
     yb171 = Yb171()
 
@@ -490,7 +612,7 @@ class FitFreeParams:
     constant. Free parameters should be left blank, """
 
     def __init__(self, x, y, 
-                 x_variable_names, 
+                 x_variable_names: list, 
                  yb_model,
                  all_variables=("thetaBE370", "s_370", "detuning370", "detuning935", "s_935", "zeeman", "thetaBE935")):
         # check if x_variable_names is in all_variables
@@ -524,6 +646,76 @@ class FitFreeParams:
         return popt, pcov
 
 
+class FitCounts:
+
+    def __init__(self, independent_variables: dict, counts: np.ndarray, fit_function):
+        """
+        This class handles fitting any function with many variables, where you can simply input what
+        variables are being held constant (independent variables), while the rest are treated as free
+        parameters to be fitted. 
+        """
+        all_variables = inspect.getargspec(fit_function).args
+        if 'self' in all_variables:
+            all_variables.remove('self')
+
+        names_of_independent_variables = list(independent_variables.keys())
+
+        if not all([name in all_variables for name in names_of_independent_variables]):
+            raise ValueError(f"x_variable_names must match exactly the names {all_variables}. Received names were {names_of_independent_variables}.")
+        
+        # Determine the free parameters to be fitted
+        self.free_params = [var for var in all_variables if var not in names_of_independent_variables]
+        
+        self.counts = counts
+
+        self.function = fit_function
+        self.independent_variables = independent_variables
+    
+    def fit_func(self, *free_params):
+        """
+        This function wraps the original function to use with curve_fit.
+        It holds certain variables constant and lets the free parameters vary.
+        
+        :param free_params: The free parameters to be fitted.
+        :return: The function evaluated with the free parameters and fixed independent variables.
+        """
+        # Combine free parameters with fixed independent variables
+        free_params = list(free_params)
+        free_params.pop(0)
+        all_params = {**self.independent_variables}
+        all_params.update(dict(zip(self.free_params, free_params)))
+        
+        return self.function(**all_params)
+
+    
+    def fit(self, p0: dict=None, sigma: list=None, **curve_fit_kwargs):
+        """
+        Fits the function to the data using curve_fit.
+        
+        :param p0: Initial guess for the free parameters.
+        :param sigma: Optional uncertainties for the dependent variable.
+        :param curve_fit_kwargs: Additional arguments to pass to curve_fit.
+        :return: Optimal values for the free parameters and the covariance matrix.
+        """
+        # Initial guess for the free parameters
+        if p0 is None:
+            p0 = [1.0] * len(self.free_params)
+        else:
+            p0 = [p0[name] for name in self.free_params]
+
+        # Perform the curve fitting
+        popt, pcov = curve_fit(self.fit_func, np.arange(len(self.counts)), self.counts, p0=p0, sigma=sigma, **curve_fit_kwargs)
+        popt = {free_param_name: pop for free_param_name, pop in zip(self.free_params, popt)}
+        pcov = {free_param_name: pop for free_param_name, pop in zip(self.free_params, pcov)}
+        all_params = {**self.independent_variables}
+        all_params.update(popt)
+        self.all_params = all_params
+        return popt, pcov
+
+
+
+
+
 def calc_171_pop_using_vectors(Er=0, Ephi=0, Etheta=0, Br=0, Bphi=0, Btheta=0, **model_kwargs):
     E = PolarVector(Er, Etheta, Ephi)
     B = PolarVector(Br, Btheta, Bphi)
@@ -531,6 +723,13 @@ def calc_171_pop_using_vectors(Er=0, Ephi=0, Etheta=0, Br=0, Bphi=0, Btheta=0, *
     return excited_pop, mesh, yb171, other_data
 
 
+def counts_171(efficiency, *args, **kwargs):
+    excited_pop, mesh, yb171, other_data = calculate_171_pop(*args, **kwargs)
+    return excited_pop * yb171.gamma_2S12_2P12 * efficiency, mesh, yb171, other_data
+
+def counts_174(efficiency, *args, **kwargs):
+    excited_pop, mesh, yb174, other_data = calculate_174_pop(*args, **kwargs)
+    return excited_pop * yb174.gamma_2S12_2P12 * efficiency, mesh, yb174, other_data 
 
 def Lorentzian(x, x0, Gamma):
     half_Gamma = Gamma/2
