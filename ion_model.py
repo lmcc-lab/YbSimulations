@@ -300,6 +300,37 @@ class Yb174(Yb):
         detuning_370_MHz: float, the detuning of the 370 laser from the excited state in units of MHz
         detuning_935_MHz: float, the detuning of the 935 laser from the excited state in units of MHz
         """
+        if photon_collection_efficiency is not None:
+            self.photon_collection_efficiency = photon_collection_efficiency
+        if power_370_W is not None:
+            self.power_370_W = power_370_W
+        if power_370_sat_W is not None:
+            self.power_370_sat_W = power_370_sat_W 
+        if E370theta_rad is not None:
+            self.E370theta_rad = E370theta_rad
+        if EO_370_voltage is not None:
+            self.EO_370_voltage = EO_370_voltage
+        if EO_angle_offset is not None:
+            self.EO_angle_offset = EO_angle_offset
+        if Btheta_rad is not None:
+            self.Btheta_rad = Btheta_rad
+        if Bphi_rad is not None:
+            self.Bphi_rad = Bphi_rad
+        if E935theta_rad is not None:
+            self.E935theta_rad = E935theta_rad 
+        if E935phi_rad is not None:
+            self.E935phi_rad = E935phi_rad
+        if power_935_W is not None:
+            self.power_935_W = power_935_W
+        if power_935_sat_W is not None:
+            self.power_935_sat_W = power_935_sat_W
+        if zeeman_shift_MHz is not None:
+            self.zeeman_shift_MHz = zeeman_shift_MHz
+        if detuning_370_MHz is not None:
+            self.detuning_370_MHz = detuning_370_MHz
+        if detuning_935_MHz is not None:
+            self.detuning_935_MHz = detuning_935_MHz
+        
         E370phi_rad = EO_370_voltage * np.pi + EO_angle_offset
         s_370 = self.s0(power_370_W, power_370_sat_W) # converting this into a saturation parameter
         s_935 = self.s0(power_935_W, power_935_sat_W) # Converting this into a saturation parameter
