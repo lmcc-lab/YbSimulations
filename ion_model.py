@@ -46,7 +46,8 @@ class Yb(YbConstants):
         self.hyperfine_splitting_2D32 = 2 * pi * self.hyperfine_splitting_2D32_Hz    # radians/s
         self.hyperfine_splitting_3D32 = 2 * pi * self.hyperfine_splitting_3D32_Hz    # radians/s
 
-        self.optimal_thetaBE = np.arccos(1/np.sqrt(3))
+        self.optimal_thetaBE_171 = np.arccos(1/np.sqrt(3))
+        self.optimal_thetaBE_174 = np.pi
 
         self.I370sat = pi * h * c * self.gamma_2S12_2P12 / ( 3 * self.lambda_2S12_2P12 ** 3)  # W/m^2
         self.I935sat = pi * h * c * self.gamma_2D32_3D3212 / (3 * self.lambda_2D32_3D3212 ** 3)  # W/m^2
@@ -78,8 +79,40 @@ class Yb(YbConstants):
                (self.branch_ratio_3D3212_2S12 * self.gamma_2D32_3D3212) * 1 / (excited_pop_D32 + epsilon)
 
 
-
+@dataclass
 class Yb171(Yb):
+
+    EO_370_voltage: float = 0.5
+    EO_angle_offset: float = np.arccos(1/np.sqrt(3))
+    power_370_W: float = 5e-6
+    power_370_sat_W: float = 1.8e-6
+    power_935_W: float = 500e-6
+    power_935_sat_W: float = 50e-6
+    E370theta_rad: float = np.pi/2
+    E370phi_rad: float = np.arccos(1/np.sqrt(3))
+    E935theta_rad: float = np.pi/2
+    Btheta_rad: float = 0.0
+    Bphi_rad: float = 0.0
+    zeeman_shift_MHz: float = 3.5
+    detuning_370_MHz: float = 5.0
+    detuning_935_MHz: float = 0.0 
+    photon_collection_efficiency: float = 0.015
+
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.E370phi_rad = self.EO_370_voltage * np.pi + self.EO_angle_offset
+        self.s_370 = self.s0(self.power_370_W, self.power_370_sat_W) # converting this into a saturation parameter
+        self.s_935 = self.s0(self.power_935_W, self.power_935_sat_W) # Converting this into a saturation parameter
+        self.E370 = PolarVector(1, self.E370theta_rad, self.E370phi_rad) # Using vectors to describe the E and B fields
+        self.E935 = PolarVector(1, self.E935theta_rad, self.E935phi_rad) #
+        self.B = PolarVector(1, self.Btheta_rad, self.Bphi_rad)          #
+        self.zeeman_shift_rad_s = 2 * np.pi * self.zeeman_shift_MHz * 1e6  # Convering to rad/s
+        self.detuning_370 = 2 * np.pi * self.detuning_370_MHz * 1e6  # converting to rad/s
+        self.detuning_935 = 2 * np.pi * self.detuning_935_MHz * 1e6  # converting to rad/s
+        self.thetaBE370 = self.B.calculate_angle_between(self.E370)
+        self.thetaB935 = self.B.calculate_angle_between(self.E935)
+
 
     def effective_linewidth(self, thetaBE, rabi_freq, zeeman_shift, gamma):
         half_linewidth_squared = (gamma/2)**2
@@ -88,28 +121,40 @@ class Yb171(Yb):
                rabi_freq**2/3 * cos2_thetaBE * (1 - 3 * cos2_thetaBE)/(1 + 3 * cos2_thetaBE) + \
                cos2_thetaBE / (1 + 3 * cos2_thetaBE) * (rabi_freq ** 4 / (36 * zeeman_shift ** 2) + 4 * zeeman_shift ** 2)
 
-    def excited_population_no_leakage(self, rabi_freq, effective_linewidth, thetaBE, detuning):
+    def excited_population_no_leakage(self, rabi_freq=None, effective_linewidth=None, thetaBE=None, detuning=None):
+        if rabi_freq is None:
+            rabi_freq = self.rabi_freq(self.s_370, self.gamma_2S12_2P12)
+        if effective_linewidth is None:
+            effective_linewidth = self.effective_linewidth(self.thetaB370, rabi_freq, self.zeeman_shift, self.gamma_2S12_2P12)
+        if thetaBE is None:
+            thetaBE = self.thetaBE370
+        if detuning is None:
+            detuning = self.detuning_370
         cos2_thetaBE = np.cos(thetaBE) ** 2
         sin2_thetaBE = np.sin(thetaBE) ** 2
         return 3/4 * cos2_thetaBE * sin2_thetaBE / (1 + 3 * cos2_thetaBE) * (rabi_freq ** 2 / 3) / \
                (detuning**2 + effective_linewidth)
     
+    def update_internal_params(self, attributes_to_update: dict):
+        for name, value in attributes_to_update.items():
+            self.__setattr__(name, value)
+
     def counts(self, 
-               photon_collection_efficiency, 
-               power_370_W, 
-               power_370_sat_W, 
-               E370theta_rad, 
-               EO_370_voltage,
-               EO_angle_offset,
-               Btheta_rad, 
-               Bphi_rad, 
-               E935theta_rad, 
-               E935phi_rad,
-               power_935_W,
-               power_935_sat_W,
-               zeeman_shift_MHz,
-               detuning_370_MHz,
-               detuning_935_MHz):
+               photon_collection_efficiency=None, 
+               power_370_W = None, 
+               power_370_sat_W = None, 
+               E370theta_rad = None, 
+               EO_370_voltage = None,
+               EO_angle_offset = None,
+               Btheta_rad = None, 
+               Bphi_rad = None, 
+               E935theta_rad = None, 
+               E935phi_rad = None,
+               power_935_W = None,
+               power_935_sat_W = None,
+               zeeman_shift_MHz = None,
+               detuning_370_MHz = None,
+               detuning_935_MHz = None):
         """
         Calculate the prediced counts from the ion given all of the possible 
         experimental configurations. This method will also acts as the fitting
@@ -133,28 +178,74 @@ class Yb171(Yb):
         detuning_370_MHz: float, the detuning of the 370 laser from the excited state in units of MHz
         detuning_935_MHz: float, the detuning of the 935 laser from the excited state in units of MHz
         """
-        E370phi_rad = EO_370_voltage * np.pi + EO_angle_offset
-        s_370 = self.s0(power_370_W, power_370_sat_W) # converting this into a saturation parameter
-        s_935 = self.s0(power_935_W, power_935_sat_W) # Converting this into a saturation parameter
-        E370 = PolarVector(1, E370theta_rad, E370phi_rad) # Using vectors to describe the E and B fields
-        E935 = PolarVector(1, E935theta_rad, E935phi_rad) #
-        B = PolarVector(1, Btheta_rad, Bphi_rad)          #
-        zeeman_shift = 2 * np.pi * zeeman_shift_MHz * 1e6  # Convering to rad/s
-        detuning_370 = 2 * np.pi * detuning_370_MHz * 1e6  # converting to rad/s
-        detuning_935 = 2 * np.pi * detuning_935_MHz * 1e6  # converting to rad/s
-        excited_pop, mesh, yb171, other_data = calculate_171_pop(b_field=B, 
-                                                                 e_field_370=E370,
-                                                                 e_field_935=E935,
-                                                                 s_370=s_370, 
-                                                                 s_935=s_935, 
-                                                                 zeeman=zeeman_shift,
-                                                                 detuning370=detuning_370,
-                                                                 detuning935=detuning_935, make_mesh=False)
+        # updating all the internal state values
+        if photon_collection_efficiency is not None:
+            self.photon_collection_efficiency = photon_collection_efficiency
+        if power_370_W is not None:
+            self.power_370_W = power_370_W
+        if power_370_sat_W is not None:
+            self.power_370_sat_W = power_370_sat_W 
+        if E370theta_rad is not None:
+            self.E370theta_rad = E370theta_rad
+        if EO_370_voltage is not None:
+            self.EO_370_voltage = EO_370_voltage
+        if EO_angle_offset is not None:
+            self.EO_angle_offset = EO_angle_offset
+        if Btheta_rad is not None:
+            self.Btheta_rad = Btheta_rad
+        if Bphi_rad is not None:
+            self.Bphi_rad = Bphi_rad
+        if E935theta_rad is not None:
+            self.E935theta_rad = E935theta_rad 
+        if E935phi_rad is not None:
+            self.E935phi_rad = E935phi_rad
+        if power_935_W is not None:
+            self.power_935_W = power_935_W
+        if power_935_sat_W is not None:
+            self.power_935_sat_W = power_935_sat_W
+        if zeeman_shift_MHz is not None:
+            self.zeeman_shift_MHz = zeeman_shift_MHz
+        if detuning_370_MHz is not None:
+            self.detuning_370_MHz = detuning_370_MHz
+        if detuning_935_MHz is not None:
+            self.detuning_935_MHz = detuning_935_MHz
+
+        self.E370phi_rad = EO_370_voltage * np.pi + EO_angle_offset
+        self.s_370 = self.s0(power_370_W, power_370_sat_W) # converting this into a saturation parameter
+        self.s_935 = self.s0(power_935_W, power_935_sat_W) # Converting this into a saturation parameter
+        self.E370 = PolarVector(1, E370theta_rad, self.E370phi_rad) # Using vectors to describe the E and B fields
+        self.E935 = PolarVector(1, E935theta_rad, E935phi_rad) #
+        self.B = PolarVector(1, Btheta_rad, Bphi_rad)          #
+        self.thetaB370 = self.B.calculate_angle_between(self.E370)
+        self.thetaB935 = self.B.calculate_angle_between(self.E935)
+        self.zeeman_shift_rad_s = 2 * np.pi * zeeman_shift_MHz * 1e6  # Convering to rad/s
+        self.detuning_370 = 2 * np.pi * detuning_370_MHz * 1e6  # converting to rad/s
+        self.detuning_935 = 2 * np.pi * detuning_935_MHz * 1e6  # converting to rad/s
+        excited_pop, mesh, yb171, other_data = calculate_171_pop(b_field=self.B, 
+                                                                 e_field_370=self.E370,
+                                                                 e_field_935=self.E935,
+                                                                 s_370=self.s_370, 
+                                                                 s_935=self.s_935, 
+                                                                 zeeman=self.zeeman_shift_rad_s,
+                                                                 detuning370=self.detuning_370,
+                                                                 detuning935=self.detuning_935, make_mesh=False)
         
         total_counts_per_s = excited_pop * self.gamma_2S12_2P12 * photon_collection_efficiency
         return total_counts_per_s
 
+    def leakage_rate_of_bright_state(self):
+        """Leakage rate of the 2S_1/2 <-> 2P_1/2 transition into the D state
+        This assumes you have already updated all the attributes of the ion
+        model, it just returns the leakage rate based on the internal attributes.
+        """
+        rabi_rate = self.rabi_freq(self.s_370, self.gamma_2S12_2P12)
+        effective_lw = self.effective_linewidth(self.thetaBE370, rabi_rate, self.zeeman_shift_rad_s, self.gamma_2S12_2P12)
+        return 2 / 27 * self.gamma_2S12_2P12  * (rabi_rate/(2*self.hyperfine_splitting_2P12))**2 * (1-self.excited_population_no_leakage(rabi_rate, effective_lw, self.thetaB370, self.detuning_370))
 
+    def leakage_rate_of_dark_state(self):
+        """Leakage rate of the dark state back into the cooling cycle"""
+        rabi_rate = self.rabi_freq(self.s_370, self.gamma_2S12_2P12)
+        return 2/9 * self.gamma_2S12_2P12 * (rabi_rate/(2*(self.hyperfine_splitting_2S12 + self.hyperfine_splitting_2P12)))**2
 
 
 
