@@ -78,6 +78,10 @@ class Yb(YbConstants):
         return self.branch_ratio_2P12_2D32 * self.gamma_2S12_2P12 / \
                (self.branch_ratio_3D3212_2S12 * self.gamma_2D32_3D3212) * 1 / (excited_pop_D32 + epsilon)
 
+    def update_internal_params(self, attributes_to_update: dict):
+        for name, value in attributes_to_update.items():
+            self.__setattr__(name, value)
+
 
 @dataclass
 class Yb171(Yb):
@@ -112,6 +116,7 @@ class Yb171(Yb):
         self.detuning_935 = 2 * np.pi * self.detuning_935_MHz * 1e6  # converting to rad/s
         self.thetaBE370 = self.B.calculate_angle_between(self.E370)
         self.thetaB935 = self.B.calculate_angle_between(self.E935)
+        self.optimal_thetaBE = self.optimal_thetaBE_171
 
 
     def effective_linewidth(self, thetaBE, rabi_freq, zeeman_shift, gamma):
@@ -134,10 +139,6 @@ class Yb171(Yb):
         sin2_thetaBE = np.sin(thetaBE) ** 2
         return 3/4 * cos2_thetaBE * sin2_thetaBE / (1 + 3 * cos2_thetaBE) * (rabi_freq ** 2 / 3) / \
                (detuning**2 + effective_linewidth)
-    
-    def update_internal_params(self, attributes_to_update: dict):
-        for name, value in attributes_to_update.items():
-            self.__setattr__(name, value)
 
     def counts(self, 
                photon_collection_efficiency=None, 
@@ -248,8 +249,39 @@ class Yb171(Yb):
         return 2/9 * self.gamma_2S12_2P12 * (rabi_rate/(2*(self.hyperfine_splitting_2S12 + self.hyperfine_splitting_2P12)))**2
 
 
-
+@dataclass
 class Yb174(Yb):
+    EO_370_voltage: float = 0.7
+    EO_angle_offset: float = -np.arccos(1/np.sqrt(3))
+    power_370_W: float = 5e-6
+    power_370_sat_W: float = 1.8e-6
+    power_935_W: float = 500e-6
+    power_935_sat_W: float = 50e-6
+    E370theta_rad: float = np.pi/2
+    E370phi_rad: float = np.arccos(1/np.sqrt(3))
+    E935theta_rad: float = np.pi/2
+    Btheta_rad: float = 0.0
+    Bphi_rad: float = 0.0
+    zeeman_shift_MHz: float = 3.5
+    detuning_370_MHz: float = 5.0
+    detuning_935_MHz: float = 0.0 
+    photon_collection_efficiency: float = 0.015
+
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.E370phi_rad = self.EO_370_voltage * np.pi + self.EO_angle_offset
+        self.s_370 = self.s0(self.power_370_W, self.power_370_sat_W) # converting this into a saturation parameter
+        self.s_935 = self.s0(self.power_935_W, self.power_935_sat_W) # Converting this into a saturation parameter
+        self.E370 = PolarVector(1, self.E370theta_rad, self.E370phi_rad) # Using vectors to describe the E and B fields
+        self.E935 = PolarVector(1, self.E935theta_rad, self.E935phi_rad) #
+        self.B = PolarVector(1, self.Btheta_rad, self.Bphi_rad)          #
+        self.zeeman_shift_rad_s = 2 * np.pi * self.zeeman_shift_MHz * 1e6  # Convering to rad/s
+        self.detuning_370 = 2 * np.pi * self.detuning_370_MHz * 1e6  # converting to rad/s
+        self.detuning_935 = 2 * np.pi * self.detuning_935_MHz * 1e6  # converting to rad/s
+        self.thetaBE370 = self.B.calculate_angle_between(self.E370)
+        self.thetaB935 = self.B.calculate_angle_between(self.E935)
+        self.optimal_thetaBE = self.optimal_thetaBE_171
 
     def effective_linewidth(self, thetaBE, rabi_freq, zeeman_shift, gamma):
         cos2 = np.cos(thetaBE)**2
