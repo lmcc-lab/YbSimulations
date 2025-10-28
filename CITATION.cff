@@ -1,0 +1,25 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: YbSimulations
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Liam Judd
+    family-names: McClelland
+    name-suffix: Mr
+    email: l.mcclelland@griffith.edu.au
+    affiliation: QUATRI
+    orcid: 'https://orcid.org/0009-0009-5219-8788'
+repository-code: 'https://github.com/lmcc-lab/YbSimulations'
+abstract: >-
+  Simulations of Yb171 and Yb174 population, counts and
+  other parameters
+keywords:
+  - Quantum
+  - Ion trap
+  - Ytterbium
+license: MIT
