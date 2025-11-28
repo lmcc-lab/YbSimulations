@@ -35,7 +35,8 @@ class YbConstants:
 
 @dataclass
 class Yb(YbConstants):
-		
+	basic_model: bool = False
+
 	def __post_init__(self):
 		self.gamma_2S12_2P12 = self.gamma_2S12_2P12_Hz * 2 * np.pi    # radians/s
 		self.gamma_2D32_3D3212 = 2 * pi * self.gamma_2D32_3D3212_Hz   # radians / s
@@ -212,7 +213,7 @@ class Yb171(Yb):
 		if detuning_935_MHz is not None:
 			self.detuning_935_MHz = detuning_935_MHz
 
-		self.E370phi_rad = self.EO_370_voltage * np.pi + self.EO_angle_offset
+		self.E370phi_rad = self.EO_370_voltage * np.pi*0.90 + self.EO_angle_offset
 		self.s_370 = self.s0(self.power_370_W, self.power_370_sat_W) # converting this into a saturation parameter
 		self.s_935 = self.s0(self.power_935_W, self.power_935_sat_W) # Converting this into a saturation parameter
 		self.E370 = PolarVector(1,self.E370theta_rad, self.E370phi_rad) # Using vectors to describe the E and B fields
@@ -231,7 +232,8 @@ class Yb171(Yb):
 																 zeeman=self.zeeman_shift_rad_s,
 																 detuning370=self.detuning_370,
 																 detuning935=self.detuning_935, make_mesh=False)
-		
+		if self.basic_model:
+			excited_pop = other_data[370]['pop']
 		total_counts_per_s = excited_pop * self.gamma_2S12_2P12 * self.photon_collection_efficiency
 		return total_counts_per_s
 
@@ -384,7 +386,8 @@ class Yb174(Yb):
 																 zeeman=self.zeeman_shift_rad_s,
 																 detuning370=self.detuning_370,
 																 detuning935=self.detuning_935, make_mesh=False)
-		
+		if self.basic_model:
+			excited_pop = other_data['excited_pop_370']
 		total_counts_per_s = excited_pop * self.gamma_2S12_2P12 * self.photon_collection_efficiency
 		return total_counts_per_s
 	
